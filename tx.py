@@ -66,14 +66,22 @@ class Tx:
     def serialize(self):
         '''Returns the byte serialization of the transaction'''
         # serialize version (4 bytes, little endian)
+        result = int_to_little_endian(self.version, 4)
         # encode_varint on the number of inputs
+        result += encode_varint(len(self.tx_ins))
         # iterate inputs
+        for tx_in in self.tx_ins:
             # serialize each input
+            result += tx_in.serialize()
         # encode_varint on the number of inputs
+        result += encode_varint(len(self.tx_outs))
         # iterate outputs
+        for tx_out in self.tx_outs:
             # serialize each output
+            result += tx_out.serialize()
         # serialize locktime (4 bytes, little endian)
-        raise NotImplementedError
+        result += int_to_little_endian(self.locktime, 4)
+        return result
 
     def fee(self):
         '''Returns the fee of this transaction in satoshi'''
@@ -139,19 +147,25 @@ class TxIn:
     def serialize(self):
         '''Returns the byte serialization of the transaction input'''
         # serialize prev_tx, little endian
+        result = self.prev_tx[::-1]
         # serialize prev_index, 4 bytes, little endian
+        result += int_to_little_endian(self.prev_index, 4)
         # get the scriptSig ready (use self.script_sig.serialize())
+        raw_script_sig = self.script_sig.serialize()
         # encode_varint on the length of the scriptSig
+        result += encode_varint(len(raw_script_sig))
         # add the scriptSig
+        result += raw_script_sig
         # serialize sequence, 4 bytes, little endian
-        raise NotImplementedError
+        result += int_to_little_endian(self.sequence, 4)
+        return result
 
     @classmethod
     def get_url(cls, testnet=False):
         if testnet:
             return 'https://testnet.blockexplorer.com/api'
         else:
-            return 'https://btc-bitcore3.trezor.io/api'
+            return 'https://blockexplorer.com/api'
 
     def fetch_tx(self, testnet=False):
         if self.prev_tx not in self.cache:
@@ -183,9 +197,10 @@ class TxIn:
         Returns the binary scriptpubkey
         '''
         # use self.fetch_tx to get the transaction
+        tx = self.fetch_tx(testnet=testnet)
         # get the output at self.prev_index
-        # return the script_pubkey property
-        raise NotImplementedError
+        # return the script_pubkey property and serialize
+        return tx.tx_outs[self.prev_index].script_pubkey
 
     def der_signature(self, index=0):
         '''returns a DER format signature and hash_type if the script_sig
@@ -233,10 +248,14 @@ class TxOut:
     def serialize(self):
         '''Returns the byte serialization of the transaction output'''
         # serialize amount, 8 bytes, little endian
+        result = int_to_little_endian(self.amount, 8)
         # get the scriptPubkey ready (use self.script_pubkey.serialize())
+        raw_script_pubkey = self.script_pubkey.serialize()
         # encode_varint on the length of the scriptPubkey
+        result += encode_varint(len(raw_script_pubkey))
         # add the scriptPubKey
-        raise NotImplementedError
+        result += raw_script_pubkey
+        return result
 
 
 class TxTest(TestCase):
